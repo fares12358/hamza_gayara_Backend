@@ -10,7 +10,7 @@ export async function getBalance() {
   return settings.cashOpening + (total?.sum ?? 0);
 }
 
-function describe(e) {
+export function describeCashEntry(e) {
   const parts = {
     payment: ['تحصيل', e.customerName, e.note],
     cash_sale: ['بيع نقدي', e.note],
@@ -48,7 +48,7 @@ export async function getLedger(from) {
       id: String(e._id),
       source: 'app',
       date: e.date,
-      description: describe(e),
+      description: describeCashEntry(e),
       income: Math.max(e.cashDelta, 0),
       expense: Math.max(-e.cashDelta, 0),
       balance,
