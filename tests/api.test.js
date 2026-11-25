@@ -63,6 +63,14 @@ test('writes from another website are blocked', async () => {
   await owner.post('/api/customers').set('Origin', 'https://evil.example').send({ name: 'عميل' }).expect(403);
 });
 
+test('only the configured frontend address may call the API from another origin', async () => {
+  const allowed = await request(app).options('/api/customers').set('Origin', 'http://localhost:5173').expect(204);
+  assert.equal(allowed.headers['access-control-allow-origin'], 'http://localhost:5173');
+  assert.equal(allowed.headers['access-control-allow-credentials'], 'true');
+  const other = await request(app).options('/api/customers').set('Origin', 'https://evil.example');
+  assert.equal(other.headers['access-control-allow-origin'], undefined);
+});
+
 test('owner adds a customer; a different spelling is a duplicate', async () => {
   const res = await owner.post('/api/customers').send({ name: 'ثلاجة تجريبية', openingBalance: 100000 }).expect(201);
   customerId = res.body.customer.id;

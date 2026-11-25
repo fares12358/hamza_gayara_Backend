@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { apiRouter } from './modules/index.js';
 import { originCheck } from './middleware/originCheck.js';
+import { cors } from './middleware/cors.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -25,6 +26,8 @@ export function createApp() {
       },
     }),
   );
+  // Before the body readers, so their error messages can be read by the app too.
+  app.use('/api', cors);
   // Cheque photos need a larger body. Everything else stays small.
   app.use('/api/cheques', express.json({ limit: '2.5mb' }));
   app.use(express.json({ limit: '100kb' }));

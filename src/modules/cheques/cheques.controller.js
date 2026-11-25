@@ -17,5 +17,11 @@ export async function create(req, res) {
 
 export async function image(req, res) {
   const found = await service.getImage(req.valid.params.id);
-  res.set({ 'Content-Type': found.contentType, 'Cache-Control': 'private, no-store' }).send(found.data);
+  res
+    .set({
+      'Content-Type': found.contentType,
+      'Cache-Control': 'private, no-store',
+      'Cross-Origin-Resource-Policy': 'same-site',
+    })
+    .send(found.data);
 }
