@@ -1,28 +1,6 @@
-/** Shared look of the exported workbooks, copied from the example Excel files. */
+/** Builds workbooks that use the exact look of the example Excel files (templates.js). */
 import ExcelJS from 'exceljs';
-
-export const COLOR = {
-  black: 'FF000000',
-  white: 'FFFFFFFF',
-  title: 'FF171616',
-  yellow: 'FFFFFF00',
-  blue: 'FF5B9BD5',
-  blueDark: 'FF2E75B6',
-  blueSoft: 'FF9DC3E6',
-  blueBand: 'FFDDEBF7',
-  gold: 'FFFFD966',
-  goldSoft: 'FFFFF2CC',
-  grey: 'FFC9C9C9',
-  green: 'FFA9D08E',
-  orange: 'FFF8CBAD',
-  red: 'FFFF0000',
-};
-
-export const FORMAT = {
-  accounting: '_(* #,##0.00_);_(* \\(#,##0.00\\);_(* "-"??_);_(@_)',
-  whole: '_-* #,##0_-;\\-* #,##0_-;_-* "-"??_-;_-@_-',
-  date: 'dd/mm/yyyy',
-};
+import { TEMPLATES, THEMES } from './templates.js';
 
 export const pounds = (piasters) => piasters / 100;
 
@@ -34,54 +12,59 @@ export const shortDate = (iso) => iso.split('-').reverse().join('/');
 /** A formula saved with its result, so previews that do not calculate still show it. */
 export const formula = (text, piasters) => ({ formula: text, result: pounds(piasters) });
 
-const side = (style) => (style ? { style } : undefined);
+export const MONTHS = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
+export const monthName = (month) => MONTHS[Number(month.slice(5, 7)) - 1];
 
-/** style: { font, size, bold, color, fill, border, sides, format, align, wrap, rtlText } */
-export function paint(cell, { font = 'Calibri', size = 11, bold = false, color = COLOR.black, fill, border = 'thin', sides, format, align = 'center', wrap = true, rtlText = true } = {}) {
-  cell.font = { name: font, size, bold, color: { argb: color } };
-  if (fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-  if (border || sides) {
-    const [left, right, top, bottom] = sides ?? [border, border, border, border];
-    cell.border = { left: side(left), right: side(right), top: side(top), bottom: side(bottom) };
-  }
-  if (format) cell.numFmt = format;
-  cell.alignment = { horizontal: align, vertical: 'middle', wrapText: wrap, ...(rtlText && { readingOrder: 'rtl' }) };
-}
-
-/** Writes a value and its style. */
-export function put(sheet, address, value, style) {
-  const cell = sheet.getCell(address);
-  cell.value = value;
-  paint(cell, style);
-  return cell;
-}
-
-/** Merges a range and styles every cell in it, so the borders go all around. */
-export function merge(sheet, range, value, style) {
-  const [from, to] = range.split(':');
-  sheet.mergeCells(range);
-  const a = sheet.getCell(from);
-  const b = sheet.getCell(to);
-  for (let row = a.row; row <= b.row; row += 1) {
-    for (let col = a.col; col <= b.col; col += 1) paint(sheet.getCell(row, col), style);
-  }
-  a.value = value;
-}
-
-export function newSheet(name, { rtl, widths = [], zoom = 100, rowHeight }) {
+/**
+ * A new workbook with the example's color theme, view and page settings.
+ * Returns helpers that style cells by the role they have in the example.
+ */
+export function newBook(key, { widths, sheetName = 'Sheet1' } = {}) {
+  const template = TEMPLATES[key];
   const book = new ExcelJS.Workbook();
   book.created = new Date();
   book.calcProperties.fullCalcOnLoad = true;
-  const sheet = book.addWorksheet(name, {
-    views: [{ rightToLeft: rtl, zoomScale: zoom }],
-    properties: rowHeight ? { defaultRowHeight: rowHeight } : {},
-    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  // The examples use Office theme colors: without their theme the colors would differ.
+  book._themes = { theme1: THEMES[template.theme] };
+
+  const sheet = book.addWorksheet(sheetName, {
+    views: [template.view],
+    pageSetup: { ...template.pageSetup },
+    properties: { defaultRowHeight: template.defaultRowHeight },
   });
-  widths.forEach((width, i) => {
+  (widths ?? template.widths).forEach((width, i) => {
     if (width) sheet.getColumn(i + 1).width = width;
   });
-  return { book, sheet };
-}
 
-export const MONTHS = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
-export const monthName = (month) => MONTHS[Number(month.slice(5, 7)) - 1];
+  /** Writes a value with the style of "role". "extra" changes only what must differ. */
+  const put = (address, value, role, extra) => {
+    const cell = typeof address === 'string' ? sheet.getCell(address) : sheet.getCell(address.row, address.col);
+    const style = template.styles[role];
+    if (!style) throw new Error(`Unknown style role "${role}" in ${key}`);
+    cell.style = { ...structuredClone(style), ...extra };
+    if (value !== undefined) cell.value = value;
+    return cell;
+  };
+
+  /**
+   * Merges a range, then styles every cell of it. "roleAt(row, col)" gives each cell
+   * its own role, so the outer borders are the same as in the example.
+   */
+  const merge = (range, value, roleAt) => {
+    const [from, to] = range.split(':').map((a) => sheet.getCell(a));
+    const bounds = { top: Number(from.row), left: Number(from.col), bottom: Number(to.row), right: Number(to.col) };
+    sheet.mergeCells(range);
+    for (let row = bounds.top; row <= bounds.bottom; row += 1) {
+      for (let col = bounds.left; col <= bounds.right; col += 1) {
+        put({ row, col }, undefined, typeof roleAt === 'function' ? roleAt(row, col, sheet.getColumn(col).letter) : roleAt);
+      }
+    }
+    sheet.getCell(bounds.top, bounds.left).value = value;
+  };
+
+  const height = (row, points) => {
+    if (points) sheet.getRow(row).height = points;
+  };
+
+  return { book, sheet, template, put, merge, height };
+}

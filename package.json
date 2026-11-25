@@ -13,7 +13,9 @@
     "test": "node --test --test-concurrency=1",
     "seed": "node src/scripts/seed.js",
     "seed:dry": "node src/scripts/seed.js",
-    "backup": "node src/scripts/backup.js"
+    "backup": "node src/scripts/backup.js",
+    "customers:dry": "node src/scripts/syncCustomers.js",
+    "cashbox:dry": "node src/scripts/syncCashbox.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

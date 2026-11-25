@@ -1,27 +1,38 @@
-/** Like "مديونيات عملاء فرع الجياره": banded table, yellow balances, closing = previous + goods - payments. */
-import { COLOR, FORMAT, formula, newSheet, pounds, put, shortDate } from './style.js';
+/** Like "مديونيات عملاء فرع الجياره": an Excel table (TableStyleMedium2) with yellow balances. */
+import { formula, newBook, pounds, shortDate } from './style.js';
 
 export function debtsWorkbook(r) {
-  const { book, sheet } = newSheet('Sheet1', { rtl: true, widths: [20, 23.1, 16.4, 14.6, 22.1], zoom: 145 });
-  const header = { size: 10, color: COLOR.white, fill: COLOR.blue };
-  [
+  const { book, sheet, put } = newBook('debts');
+  const headers = [
     'اسم العميل',
     `مديونيه يوم ${shortDate(r.previousDate)}`,
     'البضاعه المستلمه',
     'دفعات العميل',
     `مديونيه يوم ${shortDate(r.date)}`,
-  ].forEach((label, i) => put(sheet, `${'ABCDE'[i]}1`, label, header));
+  ];
+  // An Excel table needs at least one row.
+  const rows = r.rows.length ? r.rows : [{ name: '', previous: 0, goods: 0, payments: 0, closing: 0 }];
 
-  r.rows.forEach((row, i) => {
-    const n = i + 2;
-    const cell = { size: 10, bold: true, fill: i % 2 === 0 ? COLOR.blueBand : undefined };
-    const money = { ...cell, format: FORMAT.accounting };
-    put(sheet, `A${n}`, row.name, cell);
-    put(sheet, `B${n}`, pounds(row.previous), { ...money, fill: COLOR.yellow });
-    put(sheet, `C${n}`, row.goods ? pounds(row.goods) : null, money);
-    put(sheet, `D${n}`, row.payments ? pounds(row.payments) : null, money);
-    put(sheet, `E${n}`, formula(`B${n}+C${n}-D${n}`, row.closing), { ...money, fill: COLOR.yellow });
+  sheet.addTable({
+    name: 'Table1',
+    ref: 'A1',
+    headerRow: true,
+    style: { theme: 'TableStyleMedium2', showFirstColumn: false, showLastColumn: false, showRowStripes: true, showColumnStripes: false },
+    columns: headers.map((name) => ({ name, filterButton: true })),
+    rows: rows.map((row, i) => [
+      row.name,
+      pounds(row.previous),
+      row.goods ? pounds(row.goods) : null,
+      row.payments ? pounds(row.payments) : null,
+      formula(`B${i + 2}+C${i + 2}-D${i + 2}`, row.closing),
+    ]),
   });
-  if (r.rows.length) sheet.autoFilter = `A1:E${r.rows.length + 1}`;
+
+  // The cell styles of the example, on top of the table style.
+  'ABCDE'.split('').forEach((letter) => put(`${letter}1`, undefined, `head${letter}`));
+  rows.forEach((row, i) => {
+    const kind = i === rows.length - 1 ? 'last' : 'data';
+    'ABCDE'.split('').forEach((letter) => put(`${letter}${i + 2}`, undefined, `${kind}${letter}`));
+  });
   return book;
 }

@@ -1,35 +1,40 @@
 /** Like "فواتير المديونيه المتاخره": a coloured block for every late customer. */
-import { COLOR, FORMAT, excelDate, merge, newSheet, pounds, put } from './style.js';
+import { excelDate, newBook, pounds } from './style.js';
 
 export function lateWorkbook(r) {
-  const { book, sheet } = newSheet('Sheet1', { rtl: true, widths: [17.9, 21.7, 21.7, 27] });
-  const base = { size: 18 };
-  const money = { ...base, format: FORMAT.accounting };
+  const { book, put, merge, height } = newBook('late');
 
   let n = 1;
-  for (const block of r.blocks) {
-    merge(sheet, `A${n}:D${n}`, block.name, { ...base, fill: COLOR.blueSoft });
+  r.blocks.forEach((block, blockIndex) => {
+    const nameKind = blockIndex === 0 ? 'firstName' : 'name';
+    height(n, 23.25);
+    merge(`A${n}:D${n}`, block.name, (row, col, letter) => `${nameKind}${letter}`);
     n += 1;
-    ['التاريخ', 'اجمالي الفاتوره', 'المديونيه التاخره', 'اجمالي مديونيه العميل'].forEach((label, i) =>
-      put(sheet, `${'ABCD'[i]}${n}`, label, { ...base, fill: COLOR.gold }),
+    height(n, 24);
+    ['التاريخ', 'اجمالي الفاتوره', 'المديونيه التاخره ', 'اجمالي مديونيه العميل'].forEach((label, i) =>
+      put(`${'ABCD'[i]}${n}`, label, `head${'ABCD'[i]}`),
     );
-    sheet.getRow(n).height = 28;
     n += 1;
 
     const first = n;
+    const several = block.lines.length > 1;
+    const kind = several ? 'multi' : 'single';
     for (const line of block.lines) {
-      put(sheet, `A${n}`, line.date ? excelDate(line.date) : 'رصيد اقدم', { ...base, format: FORMAT.date, rtlText: !line.date });
-      put(sheet, `B${n}`, pounds(line.invoice ?? line.late), money);
-      sheet.getRow(n).height = 28;
+      height(n, several ? 27.95 : 23.25);
+      put(`A${n}`, line.date ? excelDate(line.date) : 'رصيد اقدم', `${kind}A`);
+      put(`B${n}`, pounds(line.invoice ?? line.late), `${kind}B`);
+      if (!several) {
+        put(`C${n}`, pounds(block.late), 'singleC');
+        put(`D${n}`, pounds(block.total), 'singleD');
+      }
       n += 1;
     }
-    // The two totals cover all the rows of the block.
-    for (const [col, value, fill] of [['C', block.late, COLOR.grey], ['D', block.total, COLOR.green]]) {
-      const style = { ...money, fill };
-      if (n - first > 1) merge(sheet, `${col}${first}:${col}${n - 1}`, pounds(value), style);
-      else put(sheet, `${col}${first}`, pounds(value), style);
+    if (several) {
+      // The two totals cover all the rows of the block.
+      merge(`C${first}:C${n - 1}`, pounds(block.late), 'multiC');
+      merge(`D${first}:D${n - 1}`, pounds(block.total), 'multiD');
     }
-  }
-  if (!r.blocks.length) merge(sheet, 'A1:D1', 'مفيش فواتير متاخره', { ...base, fill: COLOR.blueSoft });
+  });
+  if (!r.blocks.length) merge('A1:D1', 'مفيش فواتير متاخره', (row, col, letter) => `firstName${letter}`);
   return book;
 }
