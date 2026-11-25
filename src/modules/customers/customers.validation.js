@@ -6,6 +6,12 @@ export const createCustomerBody = z.object({
   openingBalance: signedMoney.default(0),
 });
 
+const customerName = z.string().trim().min(2, 'اكتب اسم العميل').max(100);
+
+export const updateCustomerBody = z
+  .object({ name: customerName, aliases: z.array(customerName).max(20), archived: z.boolean() })
+  .partial();
+
 export const customerParams = z.object({ id: objectId });
 
 export const statementQuery = z.object({

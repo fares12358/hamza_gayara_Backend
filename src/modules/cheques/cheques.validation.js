@@ -13,8 +13,11 @@ export const chequeBody = z.object({
   note: shortText,
   requestId,
   confirmBackdated: z.boolean().default(false),
+  confirmUnusual: z.boolean().default(false),
   // JPEG photo as base64, without the "data:" prefix.
   image: z.string().max(Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4).default(''),
 });
+
+export const listQuery = z.object({ limit: z.coerce.number().int().min(1).max(2000).default(50) });
 
 export const imageParams = z.object({ id: objectId });

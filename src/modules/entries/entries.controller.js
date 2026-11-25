@@ -17,6 +17,10 @@ export async function cash(req, res) {
   res.status(201).json({ entries: await service.createCashMovement(req.valid.body, req.user) });
 }
 
+export async function adjustment(req, res) {
+  res.status(201).json({ entries: await service.createAdjustment(req.valid.body, req.user) });
+}
+
 export async function cancel(req, res) {
   const voided = await service.voidEntry(req.valid.params.id, req.valid.body.reason, req.user);
   res.json({ voided });

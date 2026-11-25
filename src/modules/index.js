@@ -6,6 +6,7 @@ import { entriesRouter } from './entries/entries.routes.js';
 import { chequesRouter } from './cheques/cheques.routes.js';
 import { treasuryRouter } from './treasury/treasury.routes.js';
 import { reportsRouter } from './reports/reports.routes.js';
+import { auditRouter } from './audit/audit.routes.js';
 
 export const apiRouter = Router();
 
@@ -17,3 +18,4 @@ apiRouter.use('/entries', entriesRouter);
 apiRouter.use('/cheques', chequesRouter);
 apiRouter.use('/treasury', treasuryRouter);
 apiRouter.use('/reports', reportsRouter);
+apiRouter.use('/audit', auditRouter);

@@ -2,7 +2,7 @@ import * as service from './cheques.service.js';
 import { listCustomers } from '../customers/customers.service.js';
 
 export async function list(req, res) {
-  res.json({ cheques: await service.listCheques() });
+  res.json(await service.listCheques(req.valid.query.limit));
 }
 
 /** Names and balances for the cheque form. */

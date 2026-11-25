@@ -34,8 +34,11 @@ function summarize(customer, statement, settings, now) {
 export async function listCustomers() {
   const [customers, sheetRows, entries, settings] = await Promise.all([
     Customer.find({ archived: false }).lean(),
-    LedgerRow.find().lean(),
-    Entry.find({ customer: { $ne: null }, voidedAt: null }).lean(),
+    LedgerRow.find().select('customer seq date balanceAfter returnAmount invoiceAmount paymentAmount permitNo').lean(),
+    // Only the fields the balance needs.
+    Entry.find({ customer: { $ne: null }, voidedAt: null })
+      .select('customer type date amount returnAmount customerDelta createdAt')
+      .lean(),
     getSettings(),
   ]);
   const sheetByCustomer = groupBy(sheetRows, 'customer');
@@ -80,15 +83,14 @@ export async function getStatement(id, rangeDays) {
   const now = today(env.APP_TIMEZONE);
   const from = rangeDays ? addDays(now, -rangeDays) : '';
 
-  const shown = [];
-  let previousBalance = null;
-  for (const row of statement.rows) {
-    if (!from || row.date >= from) shown.push(row);
-    else previousBalance = row.balance;
-  }
+  // From the first row inside the period to the end, so the running balance has no gaps.
+  const first = from ? statement.rows.findIndex((r) => r.date >= from) : 0;
+  const start = first < 0 ? statement.rows.length : first;
+  const shown = statement.rows.slice(start);
+  const previousBalance = start > 0 ? statement.rows[start - 1].balance : null;
 
   return {
-    customer: { ...summarize(customer, statement, settings, now), source: customer.source },
+    customer: { ...summarize(customer, statement, settings, now), source: customer.source, archived: customer.archived },
     openingBalance: customer.openingBalance,
     previousBalance,
     from,
@@ -111,14 +113,23 @@ export async function getBalance(id) {
   return entries.reduce((sum, e) => sum + e.customerDelta, customer.openingBalance);
 }
 
+/** A name or other spelling may belong to one customer only. */
+async function assertNamesFree(names, exceptId) {
+  const wanted = new Set(names.map(normalizeName));
+  const others = await Customer.find(exceptId ? { _id: { $ne: exceptId } } : {}).select('name searchName aliases archived').lean();
+  for (const other of others) {
+    if ([other.searchName, ...(other.aliases ?? []).map(normalizeName)].some((n) => wanted.has(n))) {
+      throw ApiError.conflict(`الاسم ده مستخدم للعميل "${other.name}"${other.archived ? ' (في الأرشيف)' : ''}`);
+    }
+  }
+}
+
 export async function createCustomer({ name, openingBalance }, actor) {
-  const searchName = normalizeName(name);
-  const clash = await Customer.exists({ $or: [{ searchName }, { aliases: name }] });
-  if (clash) throw ApiError.conflict('العميل ده موجود بالفعل');
+  await assertNamesFree([name]);
 
   return withTransaction(async (session) => {
     const [customer] = await Customer.create(
-      [{ name, searchName, openingBalance, openingDate: today(env.APP_TIMEZONE), source: 'app' }],
+      [{ name, searchName: normalizeName(name), openingBalance, openingDate: today(env.APP_TIMEZONE), source: 'app' }],
       { session },
     );
     await recordAudit(
@@ -127,4 +138,40 @@ export async function createCustomer({ name, openingBalance }, actor) {
     );
     return { id: String(customer._id), name: customer.name };
   });
+}
+
+/** Rename, other spellings, archive. Money fields cannot change here. */
+export async function updateCustomer(id, changes, actor) {
+  const customer = await Customer.findById(id);
+  if (!customer) throw ApiError.notFound('العميل مش موجود');
+  const before = { name: customer.name, aliases: [...customer.aliases], archived: customer.archived };
+
+  const name = changes.name ?? customer.name;
+  let aliases = changes.aliases ?? [...customer.aliases];
+  // The old name stays searchable.
+  if (name !== before.name) aliases.push(before.name);
+  aliases = [...new Set(aliases)].filter((a) => a !== name);
+  if (changes.name || changes.aliases) await assertNamesFree([name, ...aliases], customer._id);
+
+  if (changes.archived === true && !customer.archived && Math.abs(await getBalance(id)) >= SETTLED) {
+    throw ApiError.conflict('ماينفعش تأرشف عميل رصيده مش خالص');
+  }
+
+  customer.set({ name, searchName: normalizeName(name), aliases, archived: changes.archived ?? customer.archived });
+  await withTransaction(async (session) => {
+    await customer.save({ session });
+    await recordAudit(
+      {
+        actor, action: 'update', entity: 'customer', entityId: customer._id,
+        data: { name, before, after: { name, aliases, archived: customer.archived } },
+      },
+      session,
+    );
+  });
+  return { id: String(customer._id), name };
+}
+
+export async function listArchived() {
+  const customers = await Customer.find({ archived: true }).sort({ name: 1 }).lean();
+  return customers.map((c) => ({ id: String(c._id), name: c.name }));
 }

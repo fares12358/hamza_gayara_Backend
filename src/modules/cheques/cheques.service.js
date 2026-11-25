@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ChequeImage } from './chequeImage.model.js';
 import { MAX_IMAGE_BYTES } from './cheques.validation.js';
 import { Entry } from '../entries/entries.model.js';
@@ -12,9 +13,13 @@ function decodeJpeg(base64) {
   return data;
 }
 
-export async function listCheques(limit = 50) {
-  const entries = await Entry.find({ type: 'cheque', voidedAt: null }).sort({ createdAt: -1 }).limit(limit).lean();
-  return entries.map(toEntryDto);
+export async function listCheques(limit) {
+  const filter = { type: 'cheque', voidedAt: null };
+  const [entries, total] = await Promise.all([
+    Entry.find(filter).sort({ createdAt: -1 }).limit(limit).lean(),
+    Entry.countDocuments(filter),
+  ]);
+  return { cheques: entries.map(toEntryDto), total };
 }
 
 export async function createCheque(input, actor) {
@@ -29,6 +34,8 @@ export async function createCheque(input, actor) {
     actor,
     requestId: input.requestId,
     confirmBackdated: input.confirmBackdated,
+    confirmUnusual: input.confirmUnusual,
+    extraHash: data ? createHash('sha256').update(data).digest('hex') : '',
     // The photo is saved in the same transaction as the cheque.
     beforeSave: data
       ? async (session) => {

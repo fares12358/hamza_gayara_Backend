@@ -7,6 +7,7 @@ const common = {
   note: shortText,
   requestId,
   confirmBackdated: z.boolean().default(false),
+  confirmUnusual: z.boolean().default(false),
 };
 
 export const invoiceBody = z
@@ -29,6 +30,15 @@ export const cashBody = z.discriminatedUnion('type', [
   z.object({ ...common, type: z.literal('expense'), category: z.enum(EXPENSE_CATEGORIES), amount: positiveMoney }),
   z.object({ ...common, type: z.literal('transfer'), amount: positiveMoney }),
 ]);
+
+export const adjustmentBody = z.object({
+  ...common,
+  // A correction must always say why.
+  note: z.string().trim().min(3, 'اكتب سبب التسوية').max(200),
+  customerId: objectId,
+  direction: z.enum(['add', 'reduce']),
+  amount: positiveMoney,
+});
 
 export const listQuery = z.object({
   types: z

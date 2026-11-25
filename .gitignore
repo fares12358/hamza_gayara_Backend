@@ -12,6 +12,8 @@ node_modules/
 
 # REAL BUSINESS DATA: never commit
 seed-reports/
+backups/
+*.gybk
 dump/
 backup/
 exports/

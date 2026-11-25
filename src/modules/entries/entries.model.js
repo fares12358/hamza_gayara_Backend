@@ -1,7 +1,11 @@
 import mongoose from 'mongoose';
 import { moneyField } from '../../utils/schema.js';
 
-export const ENTRY_TYPES = ['invoice', 'payment', 'cheque', 'cash_sale', 'expense', 'transfer'];
+export const ENTRY_TYPES = [
+  'invoice', 'payment', 'cheque', 'cash_sale', 'expense', 'transfer',
+  // Owner corrections of a customer debt. They never touch the cash box or the income.
+  'debt_add', 'debt_reduce',
+];
 
 export const EXPENSE_CATEGORIES = [
   'كهرباء', 'صيانة', 'مائدة', 'إكراميات', 'مرتبات وأجور', 'سلف',
@@ -46,6 +50,8 @@ const entrySchema = new mongoose.Schema(
     groupId: { type: String, required: true, index: true, ...fixed },
     // The same request sent twice is saved once.
     requestId: { type: String, required: true, unique: true, ...fixed },
+    // Everything the user entered, to compare retries. Empty on older records.
+    requestHash: { type: String, default: '', ...fixed },
     createdBy: { type: ObjectId, ref: 'User', required: true, ...fixed },
     voidedAt: { type: Date, default: null },
     voidedBy: { type: ObjectId, ref: 'User', default: null },
@@ -56,5 +62,6 @@ const entrySchema = new mongoose.Schema(
 
 entrySchema.index({ customer: 1, date: 1 });
 entrySchema.index({ date: 1, type: 1 });
+entrySchema.index({ type: 1, 'cheque.number': 1 });
 
 export const Entry = mongoose.model('Entry', entrySchema);

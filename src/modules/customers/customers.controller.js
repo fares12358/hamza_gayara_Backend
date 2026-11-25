@@ -11,3 +11,11 @@ export async function statement(req, res) {
 export async function create(req, res) {
   res.status(201).json({ customer: await service.createCustomer(req.valid.body, req.user) });
 }
+
+export async function update(req, res) {
+  res.json({ customer: await service.updateCustomer(req.valid.params.id, req.valid.body, req.user) });
+}
+
+export async function archived(req, res) {
+  res.json({ customers: await service.listArchived() });
+}

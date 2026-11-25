@@ -7,6 +7,7 @@ import { connectDatabase, disconnectDatabase } from '../config/db.js';
 import { User } from '../modules/users/users.model.js';
 import { createUserBody } from '../modules/users/users.validation.js';
 import { hashPassword } from '../modules/users/users.service.js';
+import { recordAudit } from '../modules/audit/audit.service.js';
 
 const input = createUserBody.safeParse({
   name: process.env.OWNER_NAME,
@@ -28,7 +29,8 @@ try {
     console.log('An owner already exists. Nothing was changed.');
   } else {
     const { password, ...user } = input.data;
-    await User.create({ ...user, passwordHash: await hashPassword(password) });
+    const owner = await User.create({ ...user, passwordHash: await hashPassword(password) });
+    await recordAudit({ actor: owner, action: 'create', entity: 'user', entityId: owner._id, data: { username: user.username, role: 'owner' } });
     console.log(`Owner "${user.username}" created. Now remove OWNER_PASSWORD from .env.`);
   }
 } catch (error) {
