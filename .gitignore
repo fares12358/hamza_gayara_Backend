@@ -1,0 +1,37 @@
+# This folder is its own git repository: the .gitignore above it does not apply here.
+
+# dependencies
+node_modules/
+
+# secrets: database password, JWT secret, owner password
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# REAL BUSINESS DATA: never commit
+seed-reports/
+dump/
+backup/
+exports/
+*.xlsx
+*.xls
+*.csv
+*.html
+*.bson
+*.archive
+*.dump
+
+# logs and test output
+logs/
+*.log
+coverage/
+
+# editor and system files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
